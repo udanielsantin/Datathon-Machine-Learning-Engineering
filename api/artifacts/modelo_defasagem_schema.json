@@ -1,0 +1,48 @@
+{
+  "model_name": "Ridge",
+  "target": "target_next_year",
+  "required_columns": [
+    "Fase_adj",
+    "gap_idade",
+    "feat_IPV",
+    "z_notas_fase",
+    "z_ieg_fase"
+  ],
+  "numeric_columns": [
+    "gap_idade",
+    "feat_IPV",
+    "z_notas_fase",
+    "z_ieg_fase"
+  ],
+  "categorical_columns": [
+    "Fase_adj"
+  ],
+  "metrics": {
+    "MAE": 1.1057,
+    "RMSE": 1.5695,
+    "R2": 0.308
+  },
+  "top_impact_features": [
+    {
+      "variavel_original": "Fase_adj",
+      "impacto": 4.11128009138805
+    },
+    {
+      "variavel_original": "gap_idade",
+      "impacto": 0.5876011753483961
+    },
+    {
+      "variavel_original": "z_notas_fase",
+      "impacto": 0.49912585881735794
+    },
+    {
+      "variavel_original": "feat_IPV",
+      "impacto": 0.39393859510683127
+    },
+    {
+      "variavel_original": "z_ieg_fase",
+      "impacto": 0.21841823717421485
+    }
+  ],
+  "notes": "Envie no CSV as colunas em required_columns. Colunas extras serao ignoradas."
+}
