@@ -31,3 +31,33 @@ class S3Logger:
             return True, key
         except (BotoCoreError, ClientError) as exc:
             return False, str(exc)
+
+    def read_recent_json(self, limit: int = 50) -> tuple[bool, list[dict[str, Any]], str]:
+        if not self.enabled or self.client is None:
+            return False, [], "S3 desabilitado: bucket nao configurado"
+
+        if limit <= 0:
+            return False, [], "limit deve ser maior que 0"
+
+        try:
+            response = self.client.list_objects_v2(Bucket=self.bucket, Prefix=f"{self.prefix}/" if self.prefix else "")
+            contents = response.get("Contents", [])
+
+            json_objects = [obj for obj in contents if str(obj.get("Key", "")).endswith(".json")]
+            json_objects.sort(key=lambda x: x.get("LastModified"), reverse=True)
+
+            rows: list[dict[str, Any]] = []
+            for obj in json_objects[:limit]:
+                key = obj.get("Key")
+                if not key:
+                    continue
+
+                body = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+                try:
+                    rows.append(json.loads(body.decode("utf-8")))
+                except json.JSONDecodeError:
+                    continue
+
+            return True, rows, "ok"
+        except (BotoCoreError, ClientError) as exc:
+            return False, [], str(exc)

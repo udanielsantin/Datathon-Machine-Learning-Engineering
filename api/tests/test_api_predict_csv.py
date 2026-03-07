@@ -40,10 +40,12 @@ def test_predict_csv_with_2022_input():
         "gap_idade",
         "z_notas_fase",
         "z_ieg_fase",
+        "score_de_defasagem_atual",
         "score_previsto_proximo_ano",
     }
 
     missing = expected_cols - set(result_df.columns)
     assert not missing, f"Colunas esperadas ausentes no retorno: {missing}"
     assert len(result_df) > 0
+    assert result_df["score_de_defasagem_atual"].between(0, 10).all()
     assert result_df["score_previsto_proximo_ano"].notna().all()

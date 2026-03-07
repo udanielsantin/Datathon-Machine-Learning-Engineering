@@ -1,0 +1,28 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: datathon-api
+    env_file:
+      - ./api/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/logs:/app/logs
+    restart: unless-stopped
+
+  monitor:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.monitor
+    container_name: datathon-monitor
+    env_file:
+      - ./api/.env
+    environment:
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "8501:8501"
+    restart: unless-stopped

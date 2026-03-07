@@ -19,7 +19,7 @@ from .config import (
 )
 from .logging_store import append_local_history, read_local_history
 from .model_runtime import ModelRuntime
-from .preprocessing import build_model_features, standardize_input
+from .preprocessing import ALIAS_MAP, REQUIRED_INPUT_FIELDS, build_model_features, standardize_input
 from .s3_logger import S3Logger
 
 
@@ -33,106 +33,19 @@ runtime = ModelRuntime(MODEL_PATH, SCHEMA_PATH)
 s3_logger = S3Logger(bucket=S3_BUCKET, prefix=S3_PREFIX, region=AWS_REGION)
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def _compute_current_defasagem_score(prepared_df: pd.DataFrame) -> pd.Series:
+    score_idade = prepared_df["gap_idade"]
+    score_notas = (-prepared_df["z_notas_fase"]).clip(lower=0) * 2.0
+    score_engajamento = (-prepared_df["z_ieg_fase"]).clip(lower=0) * 1.0
+    return (score_idade + score_notas + score_engajamento).clip(0, 10)
 
 
-@app.get("/schema")
-def get_schema() -> dict:
-    return runtime.schema
-
-
-@app.post("/predict-csv")
-async def predict_csv(file: UploadFile = File(...)):
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Envie um arquivo CSV valido")
-
-    raw_content = await file.read()
-    if not raw_content:
-        raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
-
-    try:
-        raw_df = pd.read_csv(BytesIO(raw_content))
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Falha ao ler CSV: {exc}") from exc
-
-    request_id = str(uuid.uuid4())
-    created_at = datetime.now(timezone.utc).isoformat()
-
-    try:
-        prepared_df = standardize_input(raw_df)
-        features_df = build_model_features(prepared_df, runtime.required_columns)
-        predictions = runtime.pipeline.predict(features_df)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Erro na inferencia: {exc}") from exc
-
-    output_df = raw_df.copy()
-    output_df["Fase_adj"] = prepared_df["Fase_adj"].values
-    output_df["gap_idade"] = prepared_df["gap_idade"].values
-    output_df["z_notas_fase"] = prepared_df["z_notas_fase"].values
-    output_df["z_ieg_fase"] = prepared_df["z_ieg_fase"].values
-    output_df["score_previsto_proximo_ano"] = predictions
-
-    phase_summary_df = (
-        output_df.groupby("Fase_adj", dropna=False)
-        .agg(
-            total_alunos=("score_previsto_proximo_ano", "size"),
-            media_prevista=("score_previsto_proximo_ano", "mean"),
-            media_gap_idade=("gap_idade", "mean"),
-            media_z_notas=("z_notas_fase", "mean"),
-            media_z_ieg=("z_ieg_fase", "mean"),
-        )
-        .reset_index()
-    )
-
-    for col in ["media_prevista", "media_gap_idade", "media_z_notas", "media_z_ieg"]:
-        phase_summary_df[col] = phase_summary_df[col].astype(float).round(4)
-
-    summary_record = {
-        "request_id": request_id,
-        "created_at_utc": created_at,
-        "input_filename": file.filename,
-        "rows_received": int(len(raw_df)),
-        "rows_scored": int(len(output_df)),
-        "api_return_mean": float(np.nanmean(output_df["score_previsto_proximo_ano"])),
-        "phase_summary": phase_summary_df.to_dict(orient="records"),
-        "required_model_columns": runtime.required_columns,
-    }
-
-    append_local_history(LOCAL_HISTORY_PATH, summary_record)
-    s3_ok, s3_info = s3_logger.upload_json(f"{request_id}.json", summary_record)
-    summary_record["s3_status"] = "ok" if s3_ok else "not_uploaded"
-    summary_record["s3_info"] = s3_info
-
-    csv_buffer = StringIO()
-    output_df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-
-    headers = {
-        "X-Request-Id": request_id,
-        "X-S3-Status": summary_record["s3_status"],
-    }
-
-    return StreamingResponse(
-        iter([csv_buffer.getvalue()]),
-        media_type="text/csv",
-        headers=headers,
-    )
-
-
-@app.get("/monitor/summary")
-def monitor_summary(limit: int = 50):
-    if limit <= 0:
-        raise HTTPException(status_code=400, detail="limit deve ser maior que 0")
-
-    rows = read_local_history(LOCAL_HISTORY_PATH)
+def _build_monitor_summary(rows: list[dict], limit: int) -> dict:
     if not rows:
         return {"total_requests": 0, "history": [], "phase_global_mean": []}
 
-    history = rows[-limit:]
+    sorted_rows = sorted(rows, key=lambda row: str(row.get("created_at_utc", "")))
+    history = sorted_rows[-limit:]
 
     phase_rows = []
     for entry in history:
@@ -171,10 +84,130 @@ def monitor_summary(limit: int = 50):
     else:
         phase_global_mean = []
 
-    return JSONResponse(
-        {
-            "total_requests": len(rows),
-            "history": history,
-            "phase_global_mean": phase_global_mean,
-        }
+    return {
+        "total_requests": len(rows),
+        "history": history,
+        "phase_global_mean": phase_global_mean,
+    }
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/schema")
+def get_schema() -> dict:
+    return {
+        "csv_input_required_columns": REQUIRED_INPUT_FIELDS,
+        "csv_input_example_header": ",".join(REQUIRED_INPUT_FIELDS),
+        "csv_input_aliases": ALIAS_MAP,
+        "model_schema": runtime.schema,
+    }
+
+
+@app.post("/predict-csv")
+async def predict_csv(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo CSV valido")
+
+    raw_content = await file.read()
+    if not raw_content:
+        raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
+
+    try:
+        raw_df = pd.read_csv(BytesIO(raw_content))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Falha ao ler CSV: {exc}") from exc
+
+    request_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    try:
+        prepared_df = standardize_input(raw_df)
+        features_df = build_model_features(prepared_df, runtime.required_columns)
+        predictions = runtime.pipeline.predict(features_df)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro na inferencia: {exc}") from exc
+
+    output_df = raw_df.copy()
+    output_df["Fase_adj"] = prepared_df["Fase_adj"].values
+    output_df["gap_idade"] = prepared_df["gap_idade"].values
+    output_df["z_notas_fase"] = prepared_df["z_notas_fase"].values
+    output_df["z_ieg_fase"] = prepared_df["z_ieg_fase"].values
+    output_df["score_de_defasagem_atual"] = _compute_current_defasagem_score(prepared_df).values
+    output_df["score_previsto_proximo_ano"] = predictions
+
+    phase_summary_df = (
+        output_df.groupby("Fase_adj", dropna=False)
+        .agg(
+            total_alunos=("score_previsto_proximo_ano", "size"),
+            media_prevista=("score_previsto_proximo_ano", "mean"),
+            media_gap_idade=("gap_idade", "mean"),
+            media_z_notas=("z_notas_fase", "mean"),
+            media_z_ieg=("z_ieg_fase", "mean"),
+        )
+        .reset_index()
     )
+
+    for col in ["media_prevista", "media_gap_idade", "media_z_notas", "media_z_ieg"]:
+        phase_summary_df[col] = phase_summary_df[col].astype(float).round(4)
+
+    summary_record = {
+        "request_id": request_id,
+        "created_at_utc": created_at,
+        "input_filename": file.filename,
+        "rows_received": int(len(raw_df)),
+        "rows_scored": int(len(output_df)),
+        "api_return_mean": float(np.nanmean(output_df["score_previsto_proximo_ano"])),
+        "api_current_score_mean": float(np.nanmean(output_df["score_de_defasagem_atual"])),
+        "phase_summary": phase_summary_df.to_dict(orient="records"),
+        "required_model_columns": runtime.required_columns,
+    }
+
+    s3_ok, s3_info = s3_logger.upload_json(f"{request_id}.json", summary_record)
+    summary_record["s3_status"] = "ok" if s3_ok else "not_uploaded"
+    summary_record["s3_info"] = s3_info
+    append_local_history(LOCAL_HISTORY_PATH, summary_record)
+
+    csv_buffer = StringIO()
+    output_df.to_csv(csv_buffer, index=False)
+    csv_buffer.seek(0)
+
+    headers = {
+        "X-Request-Id": request_id,
+        "X-S3-Status": summary_record["s3_status"],
+    }
+
+    return StreamingResponse(
+        iter([csv_buffer.getvalue()]),
+        media_type="text/csv",
+        headers=headers,
+    )
+
+
+@app.get("/monitor/summary")
+def monitor_summary(limit: int = 50):
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="limit deve ser maior que 0")
+
+    rows = read_local_history(LOCAL_HISTORY_PATH)
+    return JSONResponse(_build_monitor_summary(rows, limit))
+
+
+@app.get("/monitor/summary-s3")
+def monitor_summary_s3(limit: int = 50):
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="limit deve ser maior que 0")
+
+    ok, rows, info = s3_logger.read_recent_json(limit=limit)
+    if not ok:
+        raise HTTPException(status_code=400, detail=info)
+
+    payload = _build_monitor_summary(rows, limit)
+    payload["source"] = "s3"
+    payload["s3_bucket"] = S3_BUCKET
+    payload["s3_prefix"] = S3_PREFIX
+    return JSONResponse(payload)
