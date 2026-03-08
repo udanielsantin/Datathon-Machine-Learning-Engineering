@@ -53,7 +53,7 @@ Pipeline completa de Machine Learning, desde a coleta e pré-processamento de da
 - **`media_notas`:** Média aritmética de português, inglês e matemática
 - **`z_notas_fase`:** Z-score das notas normalizado por fase (identifica alunos acima/abaixo da média da turma)
 - **`z_ieg_fase`:** Z-score do IEG normalizado por fase (engajamento relativo)
-- **`feat_IPV`:** Índice de Ponto de Virada (vulnerabilidade socioeconômica)
+- **`feat_IPV`:** Índice de Ponto de Virada
 
 ### 3. Treinamento e Validação
 
