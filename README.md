@@ -52,8 +52,8 @@ Pipeline completa de Machine Learning, desde a coleta e pré-processamento de da
 - **`gap_idade`:** Defasagem entre idade real e idade ideal para a fase
 - **`media_notas`:** Média aritmética de português, inglês e matemática
 - **`z_notas_fase`:** Z-score das notas normalizado por fase (identifica alunos acima/abaixo da média da turma)
-- **`z_ieg_fase`:** Z-score do IEG normalizado por fase (engajamento relativo)
-- **`feat_IPV`:** Índice de Ponto de Virada
+- **`z_ieg_fase`:** Z-score do IEG normalizado por fase (engajamento relativo as atividades entregues)
+- **`feat_IPV`:** Índice de Ponto de Virada (Indicador Psicologico de Avaliação relacionado a evolução)
 
 ### 3. Treinamento e Validação
 
