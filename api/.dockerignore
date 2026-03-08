@@ -1,13 +1,40 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.so
 .pytest_cache/
+
+# Virtual environment
 .venv/
 venv/
+
+# Environment variables
 .env
+.env.*
+
+# Git
 .git/
 .gitignore
+
+# Jupyter
 .ipynb_checkpoints/
+
+# Tests (não necessários em produção)
 tests/
+test_inputs/
+test_outputs/
+test_*.py
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+*.swp

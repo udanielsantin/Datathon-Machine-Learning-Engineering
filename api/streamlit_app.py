@@ -13,13 +13,12 @@ st.caption("Acompanhamento das medias por fase e historico de retorno da API.")
 
 default_api_base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
 api_base_url = st.sidebar.text_input("API base URL", value=default_api_base_url)
-data_source = st.sidebar.selectbox("Fonte de historico", ["local", "s3"], index=0)
 limit = st.sidebar.slider("Ultimas requisicoes", min_value=5, max_value=200, value=50, step=5)
 
 if st.sidebar.button("Atualizar"):
     st.rerun()
 
-monitor_path = "/monitor/summary-s3" if data_source == "s3" else "/monitor/summary"
+monitor_path = "/monitor/summary-s3"
 summary_url = f"{api_base_url.rstrip('/')}{monitor_path}"
 
 try:

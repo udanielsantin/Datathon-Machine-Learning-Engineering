@@ -3,11 +3,9 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
-LOGS_DIR = BASE_DIR / "logs"
 
 MODEL_PATH = ARTIFACTS_DIR / "modelo_defasagem_pipeline.joblib"
 SCHEMA_PATH = ARTIFACTS_DIR / "modelo_defasagem_schema.json"
-LOCAL_HISTORY_PATH = LOGS_DIR / "inference_history.jsonl"
 
 AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
 S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
