@@ -1,0 +1,39 @@
+services:
+  # API FastAPI
+  - type: web
+    name: datathon-api
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    envVars:
+      - key: AWS_REGION
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_PREFIX
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+    healthCheckPath: /health
+
+  # Monitor Streamlit (opcional)
+  - type: web
+    name: datathon-monitor
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile.monitor
+    dockerContext: ./api
+    envVars:
+      - key: AWS_REGION
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_PREFIX
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: API_BASE_URL
+        value: https://datathon-api.onrender.com

@@ -7,8 +7,15 @@ __pycache__/
 # Virtual environment
 .venv/
 
+# Environment variables (secrets)
+.env
+api/.env
+
 # Jupyter
 .ipynb_checkpoints/
 
 # OS
 .DS_Store
+
+# Vscode
+.vscode/
