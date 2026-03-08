@@ -2,7 +2,7 @@
 
 API de previsão de defasagem escolar com deploy automatizado e monitoramento em tempo real.
 
-**🚀 Deploy:** [https://datathon-api.onrender.com](https://datathon-api.onrender.com) *(atualize com sua URL)*
+**🚀 Deploy:** [https://datathon-machine-learning-engineering-1.onrender.com](https://datathon-machine-learning-engineering-1.onrender.com)
 
 ---
 
@@ -74,7 +74,7 @@ serie,idade,ipv,portugues,ingles,matematica,ieg,Fase_adj,gap_idade,z_notas_fase,
 
 **Via cURL:**
 ```bash
-curl -X POST "https://datathon-api.onrender.com/predict-csv" \
+curl -X POST "https://datathon-machine-learning-engineering-1.onrender.com/predict-csv" \
   -H "Content-Type: multipart/form-data" \
   -F "file=@alunos.csv" \
   -o resultado.csv
@@ -84,7 +84,7 @@ curl -X POST "https://datathon-api.onrender.com/predict-csv" \
 ```python
 import requests
 
-url = "https://datathon-api.onrender.com/predict-csv"
+url = "https://datathon-machine-learning-engineering-1.onrender.com/predict-csv"
 files = {"file": open("alunos.csv", "rb")}
 response = requests.post(url, files=files)
 
@@ -94,7 +94,7 @@ with open("resultado.csv", "wb") as f:
 
 **Via Interface Web (Swagger):**
 ```
-https://datathon-api.onrender.com/docs
+https://datathon-machine-learning-engineering-1.onrender.com/docs
 ```
 
 ---
@@ -107,7 +107,7 @@ A API registra cada requisição automaticamente no **S3**.
 
 **Monitor S3:**
 ```bash
-curl https://datathon-api.onrender.com/monitor/summary-s3?limit=10
+curl https://datathon-machine-learning-engineering-1.onrender.com/monitor/summary-s3?limit=10
 ```
 
 **Informações retornadas:**
