@@ -47,8 +47,8 @@ def _to_phase_df(history: list[dict]) -> pd.DataFrame:
                     "total_alunos": phase.get("total_alunos"),
                     "media_prevista": phase.get("media_prevista"),
                     "media_gap_idade": phase.get("media_gap_idade"),
-                    "media_z_notas": phase.get("media_z_notas"),
-                    "media_z_ieg": phase.get("media_z_ieg"),
+                    "media_notas": phase.get("media_notas"),
+                    "media_ieg": phase.get("media_ieg"),
                 }
             )
 
@@ -84,9 +84,6 @@ def main() -> None:
     default_api_base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
     api_base_url = st.sidebar.text_input("API base URL", value=default_api_base_url)
     limit = st.sidebar.slider("Ultimas requisicoes", min_value=5, max_value=200, value=50, step=5)
-    alert_threshold = st.sidebar.slider(
-        "Alerta: media prevista acima de", min_value=0.0, max_value=10.0, value=6.0, step=0.1
-    )
     auto_refresh = st.sidebar.checkbox("Auto atualizar", value=False)
     refresh_seconds = st.sidebar.slider("Intervalo (segundos)", min_value=10, max_value=120, value=30, step=5)
 
@@ -131,11 +128,6 @@ def main() -> None:
         st.metric("Total de linhas processadas", total_scored)
 
     st.caption(f"Ultimo status de envio S3: {last_s3_status}")
-
-    if not history_df.empty and last_mean >= alert_threshold:
-        st.error(
-            f"Alerta: media prevista da ultima requisicao ({last_mean:.4f}) acima do limiar {alert_threshold:.1f}."
-        )
 
     st.subheader("Medias Globais por Fase")
     if phase_global:

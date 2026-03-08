@@ -55,8 +55,8 @@ def _build_monitor_summary(rows: list[dict], limit: int) -> dict:
                     "Fase_adj": phase_entry.get("Fase_adj"),
                     "media_prevista": phase_entry.get("media_prevista"),
                     "media_gap_idade": phase_entry.get("media_gap_idade"),
-                    "media_z_notas": phase_entry.get("media_z_notas"),
-                    "media_z_ieg": phase_entry.get("media_z_ieg"),
+                    "media_notas": phase_entry.get("media_notas"),
+                    "media_ieg": phase_entry.get("media_ieg"),
                     "total_alunos": phase_entry.get("total_alunos"),
                 }
             )
@@ -70,13 +70,13 @@ def _build_monitor_summary(rows: list[dict], limit: int) -> dict:
                 total_alunos=("total_alunos", "sum"),
                 media_prevista=("media_prevista", "mean"),
                 media_gap_idade=("media_gap_idade", "mean"),
-                media_z_notas=("media_z_notas", "mean"),
-                media_z_ieg=("media_z_ieg", "mean"),
+                media_notas=("media_notas", "mean"),
+                media_ieg=("media_ieg", "mean"),
             )
             .reset_index()
             .sort_values("Fase_adj")
         )
-        for col in ["media_prevista", "media_gap_idade", "media_z_notas", "media_z_ieg"]:
+        for col in ["media_prevista", "media_gap_idade", "media_notas", "media_ieg"]:
             phase_global[col] = phase_global[col].astype(float).round(4)
         phase_global_mean = phase_global.to_dict(orient="records")
     else:
@@ -135,6 +135,8 @@ async def predict_csv(file: UploadFile = File(...)):
     output_df["gap_idade"] = prepared_df["gap_idade"].values
     output_df["z_notas_fase"] = prepared_df["z_notas_fase"].values
     output_df["z_ieg_fase"] = prepared_df["z_ieg_fase"].values
+    output_df["media_notas"] = prepared_df["media_notas"].values
+    output_df["IEG"] = prepared_df["IEG"].values
     output_df["score_de_defasagem_atual"] = _compute_current_defasagem_score(prepared_df).values
     output_df["score_previsto_proximo_ano"] = predictions
 
@@ -144,13 +146,13 @@ async def predict_csv(file: UploadFile = File(...)):
             total_alunos=("score_previsto_proximo_ano", "size"),
             media_prevista=("score_previsto_proximo_ano", "mean"),
             media_gap_idade=("gap_idade", "mean"),
-            media_z_notas=("z_notas_fase", "mean"),
-            media_z_ieg=("z_ieg_fase", "mean"),
+            media_notas=("media_notas", "mean"),
+            media_ieg=("IEG", "mean"),
         )
         .reset_index()
     )
 
-    for col in ["media_prevista", "media_gap_idade", "media_z_notas", "media_z_ieg"]:
+    for col in ["media_prevista", "media_gap_idade", "media_notas", "media_ieg"]:
         phase_summary_df[col] = phase_summary_df[col].astype(float).round(4)
 
     summary_record = {
@@ -303,14 +305,13 @@ def monitor_dashboard() -> str:
 
         <div class="controls">
             <label>Ultimas requisicoes: <input id="limit" type="number" value="50" min="5" max="200" step="5" /></label>
-            <label>Alerta media >= <input id="threshold" type="number" value="6" min="0" max="10" step="0.1" /></label>
             <button id="refreshBtn">Atualizar</button>
             <label><input id="auto" type="checkbox" checked /> Auto atualizar (30s)</label>
             <span id="apiStatus" class="label">checando saude da API...</span>
         </div>
 
         <div id="kpis" class="kpis"></div>
-        <div id="alertBox" class="error"></div>
+        <div id="messageBox" class="error"></div>
 
         <div class="grid">
             <div class="card">
@@ -353,8 +354,6 @@ def monitor_dashboard() -> str:
 
         async function loadData() {
             const limit = Number(byId('limit').value || 50);
-            const threshold = Number(byId('threshold').value || 6);
-            const alertBox = byId('alertBox');
 
             await checkHealth();
             const r = await fetch(`/monitor/summary-s3?limit=${limit}`);
@@ -381,13 +380,9 @@ def monitor_dashboard() -> str:
                 </div>
             `).join('');
 
-            if (history.length && lastMean >= threshold) {
-                alertBox.style.display = 'block';
-                alertBox.textContent = `Alerta: media prevista da ultima requisicao (${lastMean.toFixed(4)}) >= limiar (${threshold.toFixed(1)}).`;
-            } else {
-                alertBox.style.display = 'none';
-                alertBox.textContent = '';
-            }
+            const messageBox = byId('messageBox');
+            messageBox.style.display = 'none';
+            messageBox.textContent = '';
 
             byId('phaseTable').innerHTML = tableFromRows(payload.phase_global_mean || []);
 
@@ -405,9 +400,9 @@ def monitor_dashboard() -> str:
             try {
                 await loadData();
             } catch (err) {
-                const alertBox = byId('alertBox');
-                alertBox.style.display = 'block';
-                alertBox.textContent = `Erro ao carregar monitor: ${err}`;
+                const messageBox = byId('messageBox');
+                messageBox.style.display = 'block';
+                messageBox.textContent = `Erro ao carregar monitor: ${err}`;
             }
         }
 
