@@ -7,7 +7,7 @@ import uuid
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from .config import (
     AWS_REGION,
@@ -208,3 +208,218 @@ def monitor_summary_s3(limit: int = 50):
     payload["s3_bucket"] = S3_BUCKET
     payload["s3_prefix"] = S3_PREFIX
     return JSONResponse(payload)
+
+
+@app.get("/monitor/dashboard", response_class=HTMLResponse)
+def monitor_dashboard() -> str:
+        return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel de Monitoramento - Defasagem</title>
+    <style>
+        :root {
+            --bg: #f4f8fb;
+            --card: #ffffff;
+            --ink: #12334a;
+            --muted: #5f7383;
+            --line: #d6e2ea;
+            --accent: #0f766e;
+            --warn: #b45309;
+        }
+        body {
+            margin: 0;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            background: linear-gradient(160deg, #eff6ff 0%, #f4f8fb 40%, #eaf7f4 100%);
+            color: var(--ink);
+        }
+        .wrap {
+            max-width: 1100px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+        h1 { margin: 0 0 8px; }
+        .sub { color: var(--muted); margin-bottom: 16px; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .label { color: var(--muted); font-size: 12px; }
+        .value { font-size: 24px; font-weight: 700; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th, td {
+            border-bottom: 1px solid var(--line);
+            padding: 8px;
+            text-align: left;
+        }
+        th { background: #f8fbfd; }
+        .status-ok { color: var(--accent); font-weight: 700; }
+        .status-warn { color: var(--warn); font-weight: 700; }
+        .error {
+            display: none;
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>Painel de Monitoramento</h1>
+        <div class="sub">Acompanhamento simples de inferencias e medias por fase (dados do S3).</div>
+
+        <div class="controls">
+            <label>Ultimas requisicoes: <input id="limit" type="number" value="50" min="5" max="200" step="5" /></label>
+            <label>Alerta media >= <input id="threshold" type="number" value="6" min="0" max="10" step="0.1" /></label>
+            <button id="refreshBtn">Atualizar</button>
+            <label><input id="auto" type="checkbox" checked /> Auto atualizar (30s)</label>
+            <span id="apiStatus" class="label">checando saude da API...</span>
+        </div>
+
+        <div id="kpis" class="kpis"></div>
+        <div id="alertBox" class="error"></div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Medias Globais por Fase</h3>
+                <div id="phaseTable"></div>
+            </div>
+            <div class="card">
+                <h3>Historico de Requisicoes</h3>
+                <div id="historyTable"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const byId = (id) => document.getElementById(id);
+        let timer = null;
+
+        function tableFromRows(rows) {
+            if (!rows || rows.length === 0) return '<div class="label">Sem dados.</div>';
+            const cols = Object.keys(rows[0]);
+            const thead = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+            const tbody = rows.map(r => '<tr>' + cols.map(c => `<td>${r[c] ?? ''}</td>`).join('') + '</tr>').join('');
+            return `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+        }
+
+        async function checkHealth() {
+            const statusEl = byId('apiStatus');
+            try {
+                const r = await fetch('/health');
+                const j = await r.json();
+                if (r.ok && j.status === 'ok') {
+                    statusEl.innerHTML = '<span class="status-ok">API saudavel</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="status-warn">API sem confirmacao de saude</span>';
+                }
+            } catch (_) {
+                statusEl.innerHTML = '<span class="status-warn">Falha ao consultar /health</span>';
+            }
+        }
+
+        async function loadData() {
+            const limit = Number(byId('limit').value || 50);
+            const threshold = Number(byId('threshold').value || 6);
+            const alertBox = byId('alertBox');
+
+            await checkHealth();
+            const r = await fetch(`/monitor/summary-s3?limit=${limit}`);
+            if (!r.ok) {
+                const msg = await r.text();
+                throw new Error(msg);
+            }
+            const payload = await r.json();
+
+            const history = payload.history || [];
+            const last = history.length ? history[history.length - 1] : null;
+            const lastMean = last && last.api_return_mean != null ? Number(last.api_return_mean) : 0;
+
+            const kpis = [
+                { label: 'Total de requisicoes', value: payload.total_requests ?? 0 },
+                { label: 'Requisicoes exibidas', value: history.length },
+                { label: 'Media ultima requisicao', value: lastMean.toFixed(4) },
+                { label: 'Ultimo status S3', value: last?.s3_status ?? 'n/a' },
+            ];
+            byId('kpis').innerHTML = kpis.map(k => `
+                <div class="card">
+                    <div class="label">${k.label}</div>
+                    <div class="value">${k.value}</div>
+                </div>
+            `).join('');
+
+            if (history.length && lastMean >= threshold) {
+                alertBox.style.display = 'block';
+                alertBox.textContent = `Alerta: media prevista da ultima requisicao (${lastMean.toFixed(4)}) >= limiar (${threshold.toFixed(1)}).`;
+            } else {
+                alertBox.style.display = 'none';
+                alertBox.textContent = '';
+            }
+
+            byId('phaseTable').innerHTML = tableFromRows(payload.phase_global_mean || []);
+
+            const historyRows = history.slice().reverse().map(x => ({
+                created_at_utc: x.created_at_utc,
+                input_filename: x.input_filename,
+                rows_scored: x.rows_scored,
+                api_return_mean: x.api_return_mean,
+                s3_status: x.s3_status,
+            }));
+            byId('historyTable').innerHTML = tableFromRows(historyRows);
+        }
+
+        async function refresh() {
+            try {
+                await loadData();
+            } catch (err) {
+                const alertBox = byId('alertBox');
+                alertBox.style.display = 'block';
+                alertBox.textContent = `Erro ao carregar monitor: ${err}`;
+            }
+        }
+
+        byId('refreshBtn').addEventListener('click', refresh);
+        byId('auto').addEventListener('change', (e) => {
+            if (timer) clearInterval(timer);
+            if (e.target.checked) timer = setInterval(refresh, 30000);
+        });
+
+        refresh();
+        timer = setInterval(refresh, 30000);
+    </script>
+</body>
+</html>
+        """
