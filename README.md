@@ -167,6 +167,6 @@ pytest tests/test_api_predict_csv.py -v
 - **Storage:** Logs locais (JSONL) + AWS S3
 - **Containerização:** Docker multi-stage
 - **Deploy:** Render.com (Blueprint YAML)
-- **Monitoramento:** Streamlit dashboard
+- **Monitoramento:** Streamlit dashboard com status da API, alertas e tendencias
 
 
