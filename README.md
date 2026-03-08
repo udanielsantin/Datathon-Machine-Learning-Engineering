@@ -229,8 +229,8 @@ Datathon-Machine-Learning-Engineering/
 ### Pré-requisitos
 
 - **Python:** 3.11 ou superior
-- **Docker:** 20.10+ (opcional, para deploy local)
-- **AWS S3:** Bucket configurado para logs (opcional, para monitoramento)
+- **Docker:** 20.10+ 
+- **AWS S3:** Bucket configurado para logs 
 - **Render.com:** Conta gratuita (para deploy em cloud)
 
 ### Deploy Local (Docker)
@@ -335,50 +335,8 @@ python tests/test_request_simple.py
 curl -X POST "http://localhost:8000/predict-csv" \
   -F "file=@api/test_inputs/pede2022_api_input.csv" \
   -o resultado.cstAPI application
-│   │   ├── model_runtime.py     # Carregamento do modelo
-│   │   ├── preprocessing.py     # Feature engineering
-│   │   ├── s3_logger.py         # Upload logs para S3
-│   │   └── config.py            # Configurações
-│   ├── artifacts/
-│   │   ├── modelo_defasagem_pipeline.joblib  # Modelo treinado
-│   │   └── modelo_defasagem_schema.json      # Schema das features
-│   ├── tests/
-│   │   └── test_api_predict_csv.py
-│   ├── Dockerfile               # Container da API
-│   ├── Dockerfile.monitor       # Container do Streamlit
-│   ├── streamlit_app.py         # Dashboard de monitoramento
-│   └── requirements.txt
-├── data/
-│   ├── modelo_previsao_defasagem.ipynb   # Notebook de treinamento
-│   └── inferencia_modelo_final_defasagem.ipynb
-├── docker-compose.yml
-├── render.yaml                  # Blueprint do Render
-└── README.md
 ```
 
----
 
-## 🧪 Testes
-
-```bash
-cd api
-
-# Teste via HTTP request (API deve estar rodando)
-python test_request_simple.py
-
-# Teste via pytest
-pytest tests/test_api_predict_csv.py -v
-```
-
----
-
-## 📝 Notas Técnicas
-
-- **Framework:** FastAPI 0.116+
-- **ML Pipeline:** scikit-learn (salvo via joblib)
-- **Storage:** Logs locais (JSONL) + AWS S3
-- **Containerização:** Docker multi-stage
-- **Deploy:** Render.com (Blueprint YAML)
-- **Monitoramento:** Streamlit dashboard com status da API, alertas e tendencias
 
 
