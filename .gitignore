@@ -11,6 +11,10 @@ __pycache__/
 .env
 api/.env
 
+# Logs (somente S3)
+logs/
+api/logs/
+
 # Jupyter
 .ipynb_checkpoints/
 

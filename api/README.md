@@ -66,8 +66,7 @@ curl -X POST "http://localhost:8000/predict-csv" \
 
 ## Logs
 
-- Local: `api/logs/inference_history.jsonl`
-- S3: um JSON por requisicao em `s3://$S3_BUCKET/$S3_PREFIX/<request_id>.json`
+Logs sao enviados para **S3**: um JSON por requisicao em `s3://$S3_BUCKET/$S3_PREFIX/<request_id>.json`
 
 Cada log contem:
 - metadados da requisicao
@@ -75,8 +74,7 @@ Cada log contem:
 - medias por fase (`media_prevista`, `media_gap_idade`, `media_z_notas`, `media_z_ieg`)
 
 Leitura de historico:
-- Local (arquivo `jsonl`): `GET /monitor/summary`
-- S3 (objetos `.json`): `GET /monitor/summary-s3`
+- **S3** (objetos `.json`): `GET /monitor/summary-s3`
 
 ## Monitoramento com Streamlit
 
@@ -85,13 +83,12 @@ cd /workspaces/Datathon-Machine-Learning-Engineering/api
 streamlit run streamlit_app.py --server.port 8501
 ```
 
-O painel consulta `GET /monitor/summary` e mostra:
+O painel consulta `GET /monitor/summary-s3` e mostra:
 - historico de retornos da API
 - medias globais por fase
 - detalhe de fases por requisicao recente
 
 Paginas de monitoramento:
-- API monitor (JSON): `http://<host>:8000/monitor/summary`
 - API monitor via S3 (JSON): `http://<host>:8000/monitor/summary-s3`
 - Dashboard Streamlit: `http://<host>:8501`
 
@@ -133,6 +130,5 @@ docker compose logs -f monitor
 Rotas uteis apos deploy:
 - `http://<EC2_PUBLIC_IP>:8000/docs`
 - `http://<EC2_PUBLIC_IP>:8000/health`
-- `http://<EC2_PUBLIC_IP>:8000/monitor/summary`
 - `http://<EC2_PUBLIC_IP>:8000/monitor/summary-s3`
 - `http://<EC2_PUBLIC_IP>:8501`

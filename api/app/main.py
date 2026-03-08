@@ -11,13 +11,11 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from .config import (
     AWS_REGION,
-    LOCAL_HISTORY_PATH,
     MODEL_PATH,
     S3_BUCKET,
     S3_PREFIX,
     SCHEMA_PATH,
 )
-from .logging_store import append_local_history, read_local_history
 from .model_runtime import ModelRuntime
 from .preprocessing import ALIAS_MAP, REQUIRED_INPUT_FIELDS, build_model_features, standardize_input
 from .s3_logger import S3Logger
@@ -170,7 +168,6 @@ async def predict_csv(file: UploadFile = File(...)):
     s3_ok, s3_info = s3_logger.upload_json(f"{request_id}.json", summary_record)
     summary_record["s3_status"] = "ok" if s3_ok else "not_uploaded"
     summary_record["s3_info"] = s3_info
-    append_local_history(LOCAL_HISTORY_PATH, summary_record)
 
     csv_buffer = StringIO()
     output_df.to_csv(csv_buffer, index=False)
@@ -190,11 +187,11 @@ async def predict_csv(file: UploadFile = File(...)):
 
 @app.get("/monitor/summary")
 def monitor_summary(limit: int = 50):
-    if limit <= 0:
-        raise HTTPException(status_code=400, detail="limit deve ser maior que 0")
-
-    rows = read_local_history(LOCAL_HISTORY_PATH)
-    return JSONResponse(_build_monitor_summary(rows, limit))
+    """Endpoint de monitor local desabilitado. Use /monitor/summary-s3"""
+    raise HTTPException(
+        status_code=410,
+        detail="Monitor local desabilitado. Use /monitor/summary-s3 para consultar logs do S3"
+    )
 
 
 @app.get("/monitor/summary-s3")
